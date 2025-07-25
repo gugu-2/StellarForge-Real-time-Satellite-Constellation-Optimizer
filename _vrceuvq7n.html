@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StellarForge - Satellite Constellation Optimizer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #0f2027;
+            --secondary: #203a43;
+            --accent: #2c5364;
+            --highlight: #00c9ff;
+            --text: #e0f7fa;
+            --danger: #ff5252;
+            --success: #4caf50;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, var(--primary), var(--secondary), var(--accent));
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            text-align: center;
+            padding: 20px 0;
+            margin-bottom: 30px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        h1 {
+            font-size: 2.8rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, var(--highlight), #92fe9d);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 15px rgba(0, 201, 255, 0.3);
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.8;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+        
+        @media (max-width: 900px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .panel {
+            background: rgba(30, 50, 60, 0.6);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .panel-title {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .panel-title i {
+            color: var(--highlight);
+        }
+        
+        #visualization {
+            height: 500px;
+            width: 100%;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            background: linear-gradient(90deg, var(--accent), var(--secondary));
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(0, 201, 255, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(1px);
+        }
+        
+        button.primary {
+            background: linear-gradient(90deg, var(--highlight), #0072ff);
+        }
+        
+        button.danger {
+            background: linear-gradient(90deg, var(--danger), #ff1744);
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .stat-card {
+            background: rgba(20, 40, 50, 0.7);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            background: rgba(30, 60, 70, 0.8);
+        }
+        
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin: 10px 0;
+            color: var(--highlight);
+        }
+        
+        .stat-label {
+            font-size: 1rem;
+            opacity: 0.8;
+        }
+        
+        .chart-container {
+            height: 300px;
+            margin-top: 20px;
+        }
+        
+        .collision-list {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        
+        .collision-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid var(--danger);
+        }
+        
+        .collision-item.safe {
+            border-left-color: var(--success);
+        }
+        
+        .collision-details {
+            flex-grow: 1;
+        }
+        
+        .collision-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .collision-time {
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+        
+        .collision-distance {
+            font-weight: 700;
+            font-size: 1.2rem;
+        }
+        
+        .collision-distance.safe {
+            color: var(--success);
+        }
+        
+        .collision-distance.critical {
+            color: var(--danger);
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        footer {
+            text-align: center;
+            padding: 30px 0;
+            margin-top: 30px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.9rem;
+            opacity: 0.7;
+        }
+        
+        .loading {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 32, 39, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            border-radius: 10px;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255, 255, 255, 0.1);
+            border-top: 5px solid var(--highlight);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-active {
+            background-color: var(--success);
+            box-shadow: 0 0 10px var(--success);
+        }
+        
+        .status-inactive {
+            background-color: var(--danger);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 StellarForge</h1>
+            <p class="subtitle">Real-time Satellite Constellation Optimizer - Preventing orbital collisions and maximizing constellation efficiency</p>
+        </header>
+        
+        <div class="dashboard">
+            <div class="panel">
+                <h2 class="panel-title">🌌 Orbital Visualization</h2>
+                <div class="controls">
+                    <button id="startBtn" class="primary">
+                        <i>▶</i> Start Simulation
+                    </button>
+                    <button id="pauseBtn">
+                        <i>⏸</i> Pause
+                    </button>
+                    <button id="resetBtn" class="danger">
+                        <i>↺</i> Reset
+                    </button>
+                    <button id="addSatBtn">
+                        <i>+</i> Add Satellite
+                    </button>
+                </div>
+                <div id="visualization">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <h2 class="panel-title">📊 System Status</h2>
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="stat-label">Active Satellites</div>
+                        <div class="stat-value" id="satCount">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Potential Collisions</div>
+                        <div class="stat-value" id="collisionCount">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">System Status</div>
+                        <div class="stat-value">
+                            <span class="status-indicator status-active"></span>
+                            <span id="systemStatus">Operational</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Processing Speed</div>
+                        <div class="stat-value" id="processingSpeed">0.03s</div>
+                    </div>
+                </div>
+                
+                <h3 style="margin: 25px 0 15px;">📈 Collision Risk Over Time</h3>
+                <div class="chart-container">
+                    <canvas id="riskChart"></canvas>
+                </div>
+                
+                <h3 style="margin: 25px 0 15px;">⚠️ Collision Alerts</h3>
+                <div class="collision-list" id="collisionList">
+                    <!-- Collision items will be added here dynamically -->
+                </div>
+            </div>
+        </div>
+        
+        <div class="panel">
+            <h2 class="panel-title">🔧 Optimization Controls</h2>
+            <div class="controls">
+                <button id="optimizeBtn" class="primary">
+                    <i>⚡</i> Run Optimization
+                </button>
+                <button id="maneuverBtn">
+                    <i>🚀</i> Execute Maneuvers
+                </button>
+                <button id="predictBtn">
+                    <i>🔮</i> Predict Future States
+                </button>
+            </div>
+            <div style="margin-top: 20px;">
+                <h3>⚙️ Optimization Parameters</h3>
+                <div style="display: flex; gap: 20px; margin-top: 15px; flex-wrap: wrap;">
+                    <div>
+                        <label for="timeHorizon">Prediction Horizon (hours):</label>
+                        <input type="range" id="timeHorizon" min="1" max="48" value="24">
+                        <span id="timeHorizonValue">24</span>h
+                    </div>
+                    <div>
+                        <label for="collisionThreshold">Collision Threshold (km):</label>
+                        <input type="range" id="collisionThreshold" min="1" max="10" value="5" step="0.5">
+                        <span id="collisionThresholdValue">5.0</span>km
+                    </div>
+                    <div>
+                        <label for="optimizationIntensity">Optimization Intensity:</label>
+                        <input type="range" id="optimizationIntensity" min="1" max="10" value="7">
+                        <span id="optimizationIntensityValue">7</span>/10
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>StellarForge v1.0 - Advanced Satellite Constellation Management System</p>
+            <p>Protecting orbital assets and preventing Kessler syndrome since 2023</p>
+        </footer>
+    </div>
+
+    <script>
+        // Satellite data structure
+        class Satellite {
+            constructor(id, name, orbitRadius, orbitSpeed, color) {
+                this.id = id;
+                this.name = name;
+                this.orbitRadius = orbitRadius;
+                this.orbitSpeed = orbitSpeed;
+                this.color = color;
+                this.angle = Math.random() * Math.PI * 2;
+                this.position = new THREE.Vector3();
+                this.velocity = new THREE.Vector3();
+                this.maneuver = null;
+                this.fuel = 100;
+                this.status = 'active';
+            }
+            
+            update(deltaTime) {
+                // Update position based on orbital mechanics
+                this.angle += this.orbitSpeed * deltaTime;
+                
+                // Apply maneuver if active
+                if (this.maneuver && this.maneuver.duration > 0) {
+                    this.orbitRadius += this.maneuver.deltaRadius * deltaTime;
+                    this.orbitSpeed += this.maneuver.deltaSpeed * deltaTime;
+                    this.maneuver.duration -= deltaTime;
+                    this.fuel -= 0.1;
+                    
+                    if (this.maneuver.duration <= 0) {
+                        this.maneuver = null;
+                    }
+                }
+                
+                // Update position in 3D space
+                this.position.x = this.orbitRadius * Math.cos(this.angle);
+                this.position.y = this.orbitRadius * Math.sin(this.angle) * 0.3; // Elliptical orbit
+                this.position.z = this.orbitRadius * Math.sin(this.angle) * 0.7;
+                
+                // Update velocity
+                this.velocity.set(
+                    -this.orbitSpeed * Math.sin(this.angle),
+                    this.orbitSpeed * Math.cos(this.angle) * 0.3,
+                    this.orbitSpeed * Math.cos(this.angle) * 0.7
+                );
+            }
+        }
+
+        // Main application
+        class StellarForge {
+            constructor() {
+                this.satellites = [];
+                this.scene = null;
+                this.camera = null;
+                this.renderer = null;
+                this.earth = null;
+                this.satelliteMeshes = {};
+                this.animationId = null;
+                this.isRunning = false;
+                this.collisionThreshold = 5000; // meters
+                this.timeHorizon = 24 * 3600; // 24 hours in seconds
+                this.optimizationIntensity = 7;
+                this.collisionHistory = [];
+                this.riskData = {
+                    labels: [],
+                     []
+                };
+                
+                this.init();
+                this.setupEventListeners();
+                this.createSampleSatellites();
+                this.updateStats();
+            }
+            
+            init() {
+                // Initialize Three.js scene
+                const container = document.getElementById('visualization');
+                const width = container.clientWidth;
+                const height = container.clientHeight;
+                
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000000);
+                this.camera.position.z = 50000;
+                
+                this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                this.renderer.setSize(width, height);
+                this.renderer.setClearColor(0x000000, 0);
+                container.appendChild(this.renderer.domElement);
+                
+                // Add lighting
+                const ambientLight = new THREE.AmbientLight(0x333333);
+                this.scene.add(ambientLight);
+                
+                const sunLight = new THREE.DirectionalLight(0xffffff, 1);
+                sunLight.position.set(100000, 50000, 100000);
+                this.scene.add(sunLight);
+                
+                // Create Earth
+                const earthGeometry = new THREE.SphereGeometry(6371, 32, 32);
+                const earthMaterial = new THREE.MeshPhongMaterial({
+                    color: 0x2233ff,
+                    specular: 0x333333,
+                    shininess: 5
+                });
+                this.earth = new THREE.Mesh(earthGeometry, earthMaterial);
+                this.scene.add(this.earth);
+                
+                // Add stars
+                const starGeometry = new THREE.BufferGeometry();
+                const starVertices = [];
+                
+                for (let i = 0; i < 10000; i++) {
+                    const x = THREE.MathUtils.randFloatSpread(2000000);
+                    const y = THREE.MathUtils.randFloatSpread(2000000);
+                    const z = THREE.MathUtils.randFloatSpread(2000000);
+                    starVertices.push(x, y, z);
+                }
+                
+                starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+                const starMaterial = new THREE.PointsMaterial({
+                    color: 0xffffff,
+                    size: 2
+                });
+                
+                const stars = new THREE.Points(starGeometry, starMaterial);
+                this.scene.add(stars);
+                
+                // Remove loading indicator
+                setTimeout(() => {
+                    container.querySelector('.loading').style.display = 'none';
+                }, 1500);
+                
+                // Initialize chart
+                this.initChart();
+                
+                // Start animation loop
+                this.animate();
+            }
+            
+            initChart() {
+                const ctx = document.getElementById('riskChart').getContext('2d');
+                this.riskChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: 'Collision Risk Index',
+                            data: [],
+                            borderColor: '#ff5252',
+                            backgroundColor: 'rgba(255, 82, 82, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: {
+                                    color: 'rgba(255, 255, 255, 0.1)'
+                                },
+                                ticks: {
+                                    color: 'rgba(255, 255, 255, 0.7)'
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    color: 'rgba(255, 255, 255, 0.1)'
+                                },
+                                ticks: {
+                                    color: 'rgba(255, 255, 255, 0.7)'
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                labels: {
+                                    color: 'rgba(255, 255, 255, 0.7)'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            createSampleSatellites() {
+                const satelliteData = [
+                    { name: "Starlink-1", radius: 550000, speed: 0.0011, color: 0x00ff00 },
+                    { name: "Starlink-2", radius: 550000, speed: 0.0011, color: 0x00ff00 },
+                    { name: "Starlink-3", radius: 550000, speed: 0.0011, color: 0x00ff00 },
+                    { name: "Starlink-4", radius: 550000, speed: 0.0011, color: 0x00ff00 },
+                    { name: "OneWeb-1", radius: 1200000, speed: 0.0007, color: 0xffaa00 },
+                    { name: "OneWeb-2", radius: 1200000, speed: 0.0007, color: 0xffaa00 },
+                    { name: "ISS", radius: 6771, speed: 0.007, color: 0xffffff },
+                    { name: "Hubble", radius: 6771, speed: 0.007, color: 0xffff00 }
+                ];
+                
+                satelliteData.forEach((data, index) => {
+                    const sat = new Satellite(
+                        `SAT-${index + 1}`,
+                        data.name,
+                        data.radius,
+                        data.speed,
+                        data.color
+                    );
+                    this.addSatellite(sat);
+                });
+            }
+            
+            addSatellite(satellite) {
+                this.satellites.push(satellite);
+                
+                // Create 3D representation
+                const geometry = new THREE.SphereGeometry(5000, 16, 16);
+                const material = new THREE.MeshBasicMaterial({ 
+                    color: satellite.color,
+                    emissive: satellite.color,
+                    emissiveIntensity: 0.5
+                });
+                
+                const mesh = new THREE.Mesh(geometry, material);
+                this.scene.add(mesh);
+                this.satelliteMeshes[satellite.id] = mesh;
+                
+                this.updateStats();
+            }
+            
+            removeSatellite(id) {
+                const index = this.satellites.findIndex(sat => sat.id === id);
+                if (index !== -1) {
+                    const satellite = this.satellites[index];
+                    this.scene.remove(this.satelliteMeshes[satellite.id]);
+                    delete this.satelliteMeshes[satellite.id];
+                    this.satellites.splice(index, 1);
+                    this.updateStats();
+                }
+            }
+            
+            update(deltaTime) {
+                if (!this.isRunning) return;
+                
+                // Update all satellites
+                this.satellites.forEach(sat => {
+                    sat.update(deltaTime);
+                    // Update 3D position
+                    if (this.satelliteMeshes[sat.id]) {
+                        this.satelliteMeshes[sat.id].position.copy(sat.position);
+                    }
+                });
+                
+                // Detect collisions
+                this.detectCollisions();
+                
+                // Update stats
+                this.updateStats();
+                
+                // Update chart data
+                this.updateChartData();
+            }
+            
+            detectCollisions() {
+                const collisions = [];
+                const now = Date.now();
+                
+                // Clear previous collision list
+                const collisionList = document.getElementById('collisionList');
+                collisionList.innerHTML = '';
+                
+                // Check all satellite pairs
+                for (let i = 0; i < this.satellites.length; i++) {
+                    for (let j = i + 1; j < this.satellites.length; j++) {
+                        const sat1 = this.satellites[i];
+                        const sat2 = this.satellites[j];
+                        
+                        // Calculate distance
+                        const distance = sat1.position.distanceTo(sat2.position);
+                        
+                        // Check for potential collision
+                        if (distance < this.collisionThreshold) {
+                            const collision = {
+                                sat1: sat1.name,
+                                sat2: sat2.name,
+                                distance: distance,
+                                time: now
+                            };
+                            
+                            collisions.push(collision);
+                            
+                            // Add to collision list
+                            const collisionItem = document.createElement('div');
+                            collisionItem.className = 'collision-item';
+                            
+                            if (distance < this.collisionThreshold * 0.5) {
+                                collisionItem.classList.add('critical');
+                            }
+                            
+                            collisionItem.innerHTML = `
+                                <div class="collision-details">
+                                    <div class="collision-title">${sat1.name} & ${sat2.name}</div>
+                                    <div class="collision-time">Detected now</div>
+                                </div>
+                                <div class="collision-distance ${distance < this.collisionThreshold * 0.5 ? 'critical' : 'safe'}">
+                                    ${(distance/1000).toFixed(1)} km
+                                </div>
+                            `;
+                            
+                            collisionList.appendChild(collisionItem);
+                        }
+                    }
+                }
+                
+                // Update collision count
+                document.getElementById('collisionCount').textContent = collisions.length;
+                
+                // Store collision history
+                this.collisionHistory.push({
+                    time: now,
+                    count: collisions.length
+                });
+                
+                // Keep only last 20 entries
+                if (this.collisionHistory.length > 20) {
+                    this.collisionHistory.shift();
+                }
+            }
+            
+            updateChartData() {
+                const now = new Date();
+                const timeLabel = `${now.getHours()}:${now.getMinutes().toString().padStart(2, '0')}`;
+                
+                this.riskData.labels.push(timeLabel);
+                this.riskData.data.push(this.collisionHistory.length > 0 ? 
+                    this.collisionHistory[this.collisionHistory.length - 1].count : 0);
+                
+                // Keep only last 20 data points
+                if (this.riskData.labels.length > 20) {
+                    this.riskData.labels.shift();
+                    this.riskData.data.shift();
+                }
+                
+                // Update chart
+                this.riskChart.data.labels = this.riskData.labels;
+                this.riskChart.data.datasets[0].data = this.riskData.data;
+                this.riskChart.update();
+            }
+            
+            optimizeConstellation() {
+                // Simulate optimization process
+                const startTime = performance.now();
+                
+                // Generate random maneuvers for satellites
+                this.satellites.forEach(sat => {
+                    if (Math.random() > 0.7) { // 30% chance of maneuver
+                        sat.maneuver = {
+                            deltaRadius: (Math.random() - 0.5) * 10000,
+                            deltaSpeed: (Math.random() - 0.5) * 0.0001,
+                            duration: 10 + Math.random() * 20
+                        };
+                    }
+                });
+                
+                const endTime = performance.now();
+                const processingTime = ((endTime - startTime) / 1000).toFixed(3);
+                document.getElementById('processingSpeed').textContent = `${processingTime}s`;
+                
+                // Show optimization message
+                const optimizeBtn = document.getElementById('optimizeBtn');
+                const originalText = optimizeBtn.innerHTML;
+                optimizeBtn.innerHTML = '<i>✓</i> Optimization Complete';
+                optimizeBtn.classList.add('primary');
+                
+                setTimeout(() => {
+                    optimizeBtn.innerHTML = originalText;
+                    optimizeBtn.classList.remove('primary');
+                }, 3000);
+            }
+            
+            updateStats() {
+                document.getElementById('satCount').textContent = this.satellites.length;
+                document.getElementById('collisionCount').textContent = 
+                    document.querySelectorAll('.collision-item').length;
+            }
+            
+            animate() {
+                this.animationId = requestAnimationFrame(() => this.animate());
+                
+                const delta = 0.1; // Simulated time step
+                this.update(delta);
+                
+                // Rotate Earth slowly
+                this.earth.rotation.y += 0.002;
+                
+                this.renderer.render(this.scene, this.camera);
+            }
+            
+            setupEventListeners() {
+                document.getElementById('startBtn').addEventListener('click', () => {
+                    this.isRunning = true;
+                    document.getElementById('systemStatus').textContent = 'Operational';
+                    document.querySelector('.status-indicator').className = 'status-indicator status-active';
+                });
+                
+                document.getElementById('pauseBtn').addEventListener('click', () => {
+                    this.isRunning = false;
+                    document.getElementById('systemStatus').textContent = 'Paused';
+                    document.querySelector('.status-indicator').className = 'status-indicator status-inactive';
+                });
+                
+                document.getElementById('resetBtn').addEventListener('click', () => {
+                    // Reset all satellites to initial positions
+                    this.satellites.forEach(sat => {
+                        sat.angle = Math.random() * Math.PI * 2;
+                        sat.maneuver = null;
+                        sat.fuel = 100;
+                    });
+                });
+                
+                document.getElementById('addSatBtn').addEventListener('click', () => {
+                    const colors = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff];
+                    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+                    
+                    const sat = new Satellite(
+                        `SAT-${this.satellites.length + 1}`,
+                        `NewSat-${this.satellites.length + 1}`,
+                        300000 + Math.random() * 500000,
+                        0.0005 + Math.random() * 0.001,
+                        randomColor
+                    );
+                    
+                    this.addSatellite(sat);
+                });
+                
+                document.getElementById('optimizeBtn').addEventListener('click', () => {
+                    this.optimizeConstellation();
+                });
+                
+                document.getElementById('maneuverBtn').addEventListener('click', () => {
+                    // Simulate executing maneuvers
+                    const maneuverBtn = document.getElementById('maneuverBtn');
+                    const originalText = maneuverBtn.innerHTML;
+                    maneuverBtn.innerHTML = '<i>✓</i> Maneuvers Executed';
+                    
+                    setTimeout(() => {
+                        maneuverBtn.innerHTML = originalText;
+                    }, 3000);
+                });
+                
+                document.getElementById('predictBtn').addEventListener('click', () => {
+                    // Simulate prediction
+                    const predictBtn = document.getElementById('predictBtn');
+                    const originalText = predictBtn.innerHTML;
+                    predictBtn.innerHTML = '<i>✓</i> Prediction Complete';
+                    
+                    setTimeout(() => {
+                        predictBtn.innerHTML = originalText;
+                    }, 3000);
+                });
+                
+                // Parameter sliders
+                document.getElementById('timeHorizon').addEventListener('input', (e) => {
+                    this.timeHorizon = parseInt(e.target.value) * 3600;
+                    document.getElementById('timeHorizonValue').textContent = e.target.value;
+                });
+                
+                document.getElementById('collisionThreshold').addEventListener('input', (e) => {
+                    this.collisionThreshold = parseFloat(e.target.value) * 1000;
+                    document.getElementById('collisionThresholdValue').textContent = e.target.value;
+                });
+                
+                document.getElementById('optimizationIntensity').addEventListener('input', (e) => {
+                    this.optimizationIntensity = parseInt(e.target.value);
+                    document.getElementById('optimizationIntensityValue').textContent = e.target.value;
+                });
+            }
+        }
+
+        // Initialize the application when the page loads
+        window.addEventListener('load', () => {
+            const app = new StellarForge();
+            
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                const container = document.getElementById('visualization');
+                const width = container.clientWidth;
+                const height = container.clientHeight;
+                
+                app.camera.aspect = width / height;
+                app.camera.updateProjectionMatrix();
+                app.renderer.setSize(width, height);
+            });
+        });
+    </script>
+</body>
+</html>
